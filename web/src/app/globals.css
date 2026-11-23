@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* Paleta tierra de Libros Ya */
+@theme {
+  --color-cream: #f6f0e6;
+  --color-sand: #ebdfcb;
+  --color-sand-dark: #d9c7a8;
+  --color-clay: #c2653a;
+  --color-clay-dark: #9b4b26;
+  --color-ochre: #d29f45;
+  --color-olive: #6b7043;
+  --color-moss: #4c5632;
+  --color-bark: #6a4e3b;
+  --color-espresso: #2e211a;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-espresso);
+  font-family: var(--font-sans);
+}
+
+/* Textura cálida sutil */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 10%, rgb(194 101 58 / 0.08), transparent 40%),
+    radial-gradient(circle at 85% 90%, rgb(107 112 67 / 0.09), transparent 45%);
+  z-index: -1;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-clay text-cream hover:bg-clay-dark;
+  }
+  .btn-secondary {
+    @apply border border-bark/30 bg-transparent text-espresso hover:bg-sand;
+  }
+  .btn-ghost {
+    @apply px-3 text-bark hover:bg-sand;
+  }
+  .input {
+    @apply w-full rounded-xl border border-bark/25 bg-white/70 px-4 py-2.5 text-espresso placeholder:text-bark/50
+      focus:border-clay focus:ring-2 focus:ring-clay/25 focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-bark;
+  }
+  .card {
+    @apply rounded-3xl border border-bark/10 bg-white/60 shadow-[0_12px_32px_-16px_rgb(46_33_26/0.25)] backdrop-blur;
+  }
+  .page-title {
+    @apply font-display text-4xl font-extrabold tracking-tight text-espresso sm:text-5xl;
+  }
+}
