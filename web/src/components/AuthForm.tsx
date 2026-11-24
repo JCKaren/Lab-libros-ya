@@ -4,8 +4,22 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { homeFor, useAuth } from '@/lib/auth/AuthProvider';
+import { invalidFieldLabels, passwordProblem } from '@/lib/formValidation';
 import { useI18n } from '@/lib/i18n/I18nProvider';
+import type { User } from '@/lib/types';
 import { Alert } from './Alert';
+
+/**
+ * Destino después de ingresar: solo rutas internas (evita redirecciones abiertas) y solo
+ * si el rol puede abrirlas. Un `next` viejo de otra sesión (p. ej. /orders al entrar como
+ * administrador) se descarta y se va al inicio de ese rol.
+ */
+function safeNext(next: string | null, user: User): string {
+  if (!next?.startsWith('/') || next.startsWith('//')) return homeFor(user);
+  const isAdminPath = next === '/admin' || /^\/admin[/?#]/.test(next);
+  if (user.role === 'administrador') return isAdminPath ? next : homeFor(user);
+  return isAdminPath ? homeFor(user) : next;
+}
 
 /** Formulario compartido de login/registro (evita duplicar lógica y estilos). */
 export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
@@ -19,16 +33,28 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     const email = String(form.get('email') ?? '');
     const password = String(form.get('password') ?? '');
+
+    // Validación visible antes de enviar (el backend vuelve a validar todo).
+    const problem = isLogin || !password ? null : passwordProblem(password, email);
+    if (problem) {
+      (formEl.elements.namedItem('password') as HTMLInputElement | null)?.focus();
+      setError(t.auth.passwordErrors[problem]);
+      return;
+    }
+    const invalid = invalidFieldLabels(formEl);
+    if (invalid.length) {
+      setError(`${t.auth.checkFields} ${invalid.join(', ')}.`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const user = isLogin ? await login(email, password) : await register(String(form.get('name') ?? ''), email, password);
-      const next = searchParams.get('next');
-      // Solo rutas internas para evitar redirecciones abiertas.
-      router.replace(next?.startsWith('/') && !next.startsWith('//') ? next : homeFor(user));
+      router.replace(safeNext(searchParams.get('next'), user));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -42,7 +68,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         <p className="font-display text-4xl leading-tight font-extrabold">{t.brand.tagline}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5 p-8 sm:p-10" noValidate={false}>
+      <form onSubmit={handleSubmit} className="space-y-5 p-8 sm:p-10" noValidate>
         <div>
           <h1 className="font-display text-3xl font-extrabold">{isLogin ? t.auth.loginTitle : t.auth.registerTitle}</h1>
           <p className="mt-1 text-bark">{isLogin ? t.auth.loginSubtitle : t.auth.registerSubtitle}</p>

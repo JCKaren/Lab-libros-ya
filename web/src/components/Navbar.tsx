@@ -88,9 +88,14 @@ export function Navbar() {
                   </button>
                 </>
               ) : (
-                <Link href="/login" className="btn btn-primary py-2" onClick={() => setOpen(false)}>
-                  {t.nav.login}
-                </Link>
+                <>
+                  <Link href="/register" className="btn btn-secondary py-2" onClick={() => setOpen(false)}>
+                    {t.nav.register}
+                  </Link>
+                  <Link href="/login" className="btn btn-primary py-2" onClick={() => setOpen(false)}>
+                    {t.nav.login}
+                  </Link>
+                </>
               ))}
           </div>
         </div>
