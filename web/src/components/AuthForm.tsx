@@ -74,9 +74,17 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
             type="password"
             className="input"
             required
-            minLength={isLogin ? 1 : 8}
+            minLength={isLogin ? 1 : 10}
+            pattern={isLogin ? undefined : '(?=.*[A-Za-z])(?=.*[0-9]).{10,}'}
+            title={isLogin ? undefined : t.auth.passwordHint}
+            aria-describedby={isLogin ? undefined : 'password-hint'}
             autoComplete={isLogin ? 'current-password' : 'new-password'}
           />
+          {!isLogin && (
+            <p id="password-hint" className="mt-1 text-xs text-bark">
+              {t.auth.passwordHint}
+            </p>
+          )}
         </div>
 
         <button type="submit" className="btn btn-primary w-full py-3" disabled={submitting}>

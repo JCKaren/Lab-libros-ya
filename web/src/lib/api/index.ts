@@ -1,4 +1,5 @@
 import type { Book, BookCategory, BookFormat, BookInput, Order, PaymentConfig, ShippingAddress, ShippingStatus, User } from '../types';
+import { API_URL } from '../config';
 import { http } from './http';
 
 export { ApiError, configureHttp } from './http';
@@ -30,6 +31,8 @@ export const authApi = {
   register: (body: { name: string; email: string; password: string }) =>
     http<AuthResponse>('/auth/register', { method: 'POST', body }),
   me: () => http<{ user: User }>('/auth/me').then((r) => r.user),
+  /** Invalida la sesión en el servidor (todos los dispositivos). */
+  logout: () => http<void>('/auth/logout', { method: 'POST' }),
 };
 
 export const booksApi = {
@@ -53,6 +56,12 @@ export const ordersApi = {
   changeStatus: (id: string, status: ShippingStatus, shipment: { carrier?: string; trackingNumber?: string } = {}) =>
     http<{ order: Order }>(`/orders/${id}/status`, { method: 'PATCH', body: { status, ...shipment } }).then((r) => r.order),
   cancel: (id: string) => http<{ order: Order }>(`/orders/${id}/cancel`, { method: 'POST' }).then((r) => r.order),
+  /** Pide un enlace de descarga firmado (vence en minutos) y devuelve su URL absoluta. */
+  download: (id: string, bookId: string) =>
+    http<{ path: string; downloadsLeft: number }>(`/orders/${id}/downloads/${bookId}`, { method: 'POST' }).then((r) => ({
+      url: `${API_URL}${r.path}`,
+      downloadsLeft: r.downloadsLeft,
+    })),
 };
 
 export const paymentsApi = {

@@ -7,8 +7,10 @@ export type CreatePaymentInput = Pick<Payment, 'orderId' | 'userId' | 'provider'
 
 export interface PaymentRepository {
   create(input: CreatePaymentInput): Promise<Payment>;
+  findById(id: string): Promise<Payment | null>;
   findByProviderOrderId(providerOrderId: string): Promise<Payment | null>;
   findReusableForOrder(orderId: string, amount: number, provider: string): Promise<Payment | null>;
+  countForOrder(orderId: string): Promise<number>;
   /** Cambio atómico: solo uno de varios intentos concurrentes obtiene el "candado" de captura. */
   transition(id: string, from: readonly PaymentStatus[], to: PaymentStatus, extra?: Partial<Pick<Payment, 'captureId'>> & { failureReason?: string }): Promise<Payment | null>;
 }
@@ -23,6 +25,7 @@ const toPayment = (doc: PaymentDocument): Payment => ({
   amount: doc.amount,
   currency: doc.currency,
   status: doc.status,
+  updatedAt: doc.updatedAt,
 });
 
 export class MongoPaymentRepository implements PaymentRepository {
@@ -39,6 +42,17 @@ export class MongoPaymentRepository implements PaymentRepository {
     return toPayment(doc);
   }
 
+  async findById(id: string) {
+    if (!isValidObjectId(id)) return null;
+    const doc = await PaymentModel.findById(id);
+    return doc ? toPayment(doc) : null;
+  }
+
+  async countForOrder(orderId: string) {
+    if (!isValidObjectId(orderId)) return 0;
+    return PaymentModel.countDocuments({ order: orderId });
+  }
+
   async findByProviderOrderId(providerOrderId: string) {
     const doc = await PaymentModel.findOne({ providerOrderId });
     return doc ? toPayment(doc) : null;
@@ -51,7 +65,7 @@ export class MongoPaymentRepository implements PaymentRepository {
   }
 
   async transition(id: string, from: readonly PaymentStatus[], to: PaymentStatus, extra: { captureId?: string; failureReason?: string } = {}) {
-    const doc = await PaymentModel.findOneAndUpdate({ _id: id, status: { $in: from } }, { $set: { status: to, ...extra } }, { new: true });
+    const doc = await PaymentModel.findOneAndUpdate({ _id: id, status: { $in: from } }, { $set: { status: to, ...extra } }, { returnDocument: 'after' });
     return doc ? toPayment(doc) : null;
   }
 }

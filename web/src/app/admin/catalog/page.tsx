@@ -255,8 +255,8 @@ function BookForm({ onCreate }: { onCreate: (input: BookInput) => Promise<boolea
         {input('price', t.manage.price, { required: true, type: 'number', min: 0.01, step: 0.01, max: 10000 })}
         {input('stock', t.manage.stock, { required: true, type: 'number', min: 0, step: 1, defaultValue: 10 })}
       </div>
-      {input('coverUrl', t.manage.coverUrl, { type: 'url', maxLength: 500 })}
-      {format === 'ebook' && input('downloadUrl', t.manage.downloadUrl, { type: 'url', maxLength: 500 })}
+      {input('coverUrl', t.manage.coverUrl, { type: 'url', maxLength: 500, pattern: 'https://.+', placeholder: 'https://' })}
+      {format === 'ebook' && input('downloadUrl', t.manage.downloadUrl, { type: 'url', maxLength: 500, pattern: 'https://.+', placeholder: 'https://' })}
       <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
         <input type="checkbox" name="active" defaultChecked className="accent-clay" />
         {t.manage.active}

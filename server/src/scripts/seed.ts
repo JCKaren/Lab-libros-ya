@@ -4,6 +4,7 @@ import { UserModel } from '../models/User';
 import type { BookInput } from '../repositories/BookRepository';
 import { BcryptPasswordHasher } from '../services/PasswordHasher';
 import { logger } from '../utils/logger';
+import { passwordSchema } from '../validators/schemas';
 
 /** Portadas de Open Library por ISBN; si no existen, el frontend dibuja una portada ilustrada. */
 const cover = (isbn: string) => `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
@@ -122,10 +123,13 @@ const BOOKS: SeedBook[] = [
   },
 ];
 
-/** Cuentas ficticias de prueba (no usar datos personales reales). */
+/**
+ * Cuentas ficticias de prueba. SIN contraseñas por defecto: se crean solo si se
+ * definen SEED_ADMIN_PASSWORD / SEED_CLIENT_PASSWORD (y cumplen la política).
+ */
 const USERS = [
-  { name: 'Admin Libros Ya', email: 'admin@librosya.com', role: 'administrador' as const, password: process.env.SEED_ADMIN_PASSWORD ?? 'Admin123!' },
-  { name: 'Cliente Demo', email: 'cliente@librosya.com', role: 'cliente' as const, password: process.env.SEED_CLIENT_PASSWORD ?? 'Cliente123!' },
+  { name: 'Admin Libros Ya', email: 'admin@librosya.com', role: 'administrador' as const, passwordEnv: 'SEED_ADMIN_PASSWORD' },
+  { name: 'Cliente Demo', email: 'cliente@librosya.com', role: 'cliente' as const, passwordEnv: 'SEED_CLIENT_PASSWORD' },
 ];
 
 async function seed(): Promise<void> {
@@ -147,7 +151,17 @@ async function seed(): Promise<void> {
 
   for (const u of USERS) {
     if (await UserModel.exists({ email: u.email })) continue;
-    await UserModel.create({ name: u.name, email: u.email, role: u.role, passwordHash: await hasher.hash(u.password) });
+    const password = process.env[u.passwordEnv];
+    if (!password) {
+      logger.warn(`No se creó ${u.email}: define ${u.passwordEnv} para crearlo`);
+      continue;
+    }
+    const check = passwordSchema.safeParse(password);
+    if (!check.success) {
+      logger.warn(`No se creó ${u.email}: ${u.passwordEnv} no cumple la política (${check.error.issues[0].message})`);
+      continue;
+    }
+    await UserModel.create({ name: u.name, email: u.email, role: u.role, passwordHash: await hasher.hash(password) });
     logger.info(`Usuario de prueba creado: ${u.email} (${u.role})`);
   }
 

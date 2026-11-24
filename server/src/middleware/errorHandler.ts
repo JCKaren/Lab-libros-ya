@@ -19,6 +19,17 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     return;
   }
 
+  if (err?.type === 'entity.too.large') {
+    res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'La solicitud es demasiado grande' } });
+    return;
+  }
+
+  // Índice único violado (p. ej. dos registros simultáneos con el mismo correo).
+  if (err?.code === 11000) {
+    res.status(409).json({ error: { code: 'CONFLICT', message: 'El recurso ya existe' } });
+    return;
+  }
+
   if (err?.type === 'entity.parse.failed') {
     res.status(400).json({ error: { code: 'INVALID_JSON', message: 'JSON mal formado' } });
     return;

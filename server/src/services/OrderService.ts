@@ -8,6 +8,10 @@ import { AppError } from '../utils/AppError';
 import type { OrderNotifier } from './OrderNotifier';
 
 const DELIVERED_VISIBLE_MS = 3 * 24 * 60 * 60 * 1000;
+/** Pedidos sin pagar que puede tener abiertos un cliente a la vez. */
+export const MAX_UNPAID_ORDERS = 5;
+/** Un pedido sin pagar vence (se cancela) tras este tiempo. */
+export const UNPAID_TTL_MS = 24 * 60 * 60 * 1000;
 
 const PRICING_MESSAGES = {
   BOOK_NOT_FOUND: 'Un libro del carrito ya no existe',
@@ -40,6 +44,9 @@ export class OrderService {
    * precio, total, stock y necesidad de envío los decide el servidor.
    */
   async create(user: AuthUser, input: CreateOrderCommand): Promise<Order> {
+    if ((await this.orders.countUnpaidByUser(user.id)) >= MAX_UNPAID_ORDERS) {
+      throw AppError.conflict('TOO_MANY_PENDING_ORDERS', 'Tienes demasiados pedidos sin pagar; paga o cancela alguno');
+    }
     const catalog = await this.books.findManyByIds(input.items.map((i) => i.bookId));
     let priced;
     try {
@@ -101,17 +108,28 @@ export class OrderService {
     return updated;
   }
 
-  /** El cliente puede cancelar un pedido que aún no ha pagado. */
+  /**
+   * El cliente puede cancelar un pedido que aún no ha pagado. Es atómico con el
+   * candado de cobro: si hay una captura en curso, la cancelación se rechaza.
+   */
   async cancelUnpaid(user: AuthUser, orderId: string): Promise<Order> {
     const order = await this.getVisible(user, orderId);
     if (order.userId !== user.id) throw AppError.notFound('Pedido');
     if (!canTransition(order.status, 'CANCELLED', user.role)) {
       throw AppError.badRequest('INVALID_TRANSITION', 'Solo se pueden cancelar pedidos pendientes de pago');
     }
-    const updated = await this.orders.transitionStatus(orderId, order.status, 'CANCELLED', { byUserId: user.id });
-    if (!updated) throw AppError.conflict('STALE_ORDER', 'El pedido cambió mientras tanto');
+    if (order.paymentStatus === 'PROCESSING') {
+      throw AppError.conflict('PAYMENT_IN_PROGRESS', 'Hay un pago en curso para este pedido; no se puede cancelar');
+    }
+    const updated = await this.orders.cancelUnpaid(orderId, user.id);
+    if (!updated) throw AppError.conflict('STALE_ORDER', 'El pedido cambió mientras tanto (puede haber un pago en curso)');
     this.notifier.orderStatusChanged(updated);
     return updated;
+  }
+
+  /** Vence pedidos sin pagar antiguos (los llama el temporizador del servidor). */
+  expireUnpaid(now = new Date()): Promise<number> {
+    return this.orders.expireUnpaid(new Date(now.getTime() - UNPAID_TTL_MS));
   }
 
   /** Datos de envío que se registran en cada transición. */

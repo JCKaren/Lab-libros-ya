@@ -39,7 +39,9 @@ export interface OrderItem {
   unitPrice: number;
   quantity: number;
   subtotal: number;
+  /** Interno: nunca se envía al navegador; las descargas pasan por enlaces firmados. */
   downloadUrl?: string;
+  downloads: number;
 }
 
 export interface ShippingAddress {
@@ -69,6 +71,11 @@ export interface Order {
   currency: string;
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
+  /** Candado de cobro: pago en curso y desde cuándo (para conciliar capturas interrumpidas). */
+  activePaymentId?: string;
+  paymentLockedAt?: Date;
+  /** El stock del pedido ya está descontado (evita descontarlo dos veces al reintentar). */
+  stockReserved: boolean;
   paidAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -84,9 +91,10 @@ export interface Payment {
   amount: number;
   currency: string;
   status: PaymentStatus;
+  updatedAt: Date;
 }
 
-/** Usuario autenticado extraído del JWT. */
+/** Usuario autenticado. El rol y el nombre se leen de la base de datos en cada petición. */
 export interface AuthUser {
   id: string;
   role: Role;

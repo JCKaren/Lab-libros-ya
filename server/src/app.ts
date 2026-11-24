@@ -7,13 +7,15 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimits';
 import { buildApiRouter } from './routes';
 
-export function createApp(container: Container, allowedOrigins: string[]): Express {
+export function createApp(container: Container, allowedOrigins: string[], trustProxy: number): Express {
   const app = express();
 
-  app.set('trust proxy', 1); // Railway termina TLS en un proxy
+  // Railway termina TLS en un proxy (1 salto). Sin proxy debe ser 0 (ver TRUST_PROXY).
+  app.set('trust proxy', trustProxy);
   app.disable('x-powered-by');
   app.use(helmet());
-  app.use(cors({ origin: allowedOrigins, credentials: true }));
+  // Autenticación por cabecera Bearer, no por cookies: no se necesitan credenciales CORS.
+  app.use(cors({ origin: allowedOrigins, credentials: false }));
   app.use(express.json({ limit: '100kb' }));
 
   /** Salud del servicio, sin exponer configuración. */

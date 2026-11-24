@@ -23,7 +23,10 @@ export class PricingError extends Error {
  * Calcula líneas y total usando SOLO datos del catálogo (fuente de verdad del servidor).
  * Agrupa ítems repetidos, valida stock y guarda un snapshot del precio en cada línea.
  */
-export function priceOrder(requested: RequestedItem[], catalog: CatalogBook[]): { lines: OrderItem[]; total: number } {
+/** Línea calculada; el contador de descargas lo inicializa el repositorio. */
+export type PricedLine = Omit<OrderItem, 'downloads'>;
+
+export function priceOrder(requested: RequestedItem[], catalog: CatalogBook[]): { lines: PricedLine[]; total: number } {
   const byId = new Map(catalog.map((b) => [b.id, b]));
   const merged = new Map<string, number>();
 
@@ -33,7 +36,7 @@ export function priceOrder(requested: RequestedItem[], catalog: CatalogBook[]): 
   }
 
   let totalCents = 0;
-  const lines: OrderItem[] = [];
+  const lines: PricedLine[] = [];
 
   for (const [bookId, quantity] of merged) {
     const book = byId.get(bookId);

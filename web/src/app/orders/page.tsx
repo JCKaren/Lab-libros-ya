@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { Alert } from '@/components/Alert';
 import { FormatBadge } from '@/components/FormatBadge';
 import { LiveIndicator } from '@/components/LiveIndicator';
@@ -8,6 +9,7 @@ import { RoleGuard } from '@/components/RoleGuard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ordersApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { fill } from '@/lib/i18n/es';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 import { shortId, upsertOrder } from '@/lib/orderFlow';
 import { useRealtime } from '@/lib/realtime/useRealtime';
@@ -57,6 +59,49 @@ function OrdersList() {
   );
 }
 
+/** Pide un enlace firmado y lo abre en otra pestaña (la URL permanente nunca llega al navegador). */
+function DownloadButton({ orderId, bookId, left }: { orderId: string; bookId: string; left: number }) {
+  const { t, errorMessage } = useI18n();
+  const [remaining, setRemaining] = useState(left);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const download = async () => {
+    // Se abre la pestaña de inmediato (gesto del usuario) para que el navegador no la bloquee.
+    const tab = window.open('about:blank', '_blank');
+    setBusy(true);
+    setError(null);
+    try {
+      const { url, downloadsLeft } = await ordersApi.download(orderId, bookId);
+      setRemaining(downloadsLeft);
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = url;
+      } else window.location.assign(url);
+    } catch (err) {
+      tab?.close();
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="flex flex-col items-end">
+      <button
+        type="button"
+        onClick={download}
+        disabled={busy || remaining <= 0}
+        className="cursor-pointer font-semibold text-moss hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        ⬇ {t.orders.download}
+      </button>
+      <span className="text-[11px] text-bark">{fill(t.orders.downloadsLeft, { n: remaining })}</span>
+      {error && <span className="text-[11px] text-clay-dark">{error}</span>}
+    </span>
+  );
+}
+
 function OrderCard({ order }: { order: Order }) {
   const { t, pick, formatPrice, formatDate } = useI18n();
   const paid = order.paymentStatus === 'PAID';
@@ -81,10 +126,8 @@ function OrderCard({ order }: { order: Order }) {
               {item.quantity}× {pick(item.title)} <FormatBadge format={item.format} />
             </span>
             {item.format === 'ebook' && paid &&
-              (item.downloadUrl ? (
-                <a href={item.downloadUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-moss hover:underline">
-                  ⬇ {t.orders.download}
-                </a>
+              (item.downloadable ? (
+                <DownloadButton orderId={order.id} bookId={item.bookId} left={item.downloadsLeft ?? 0} />
               ) : (
                 <span className="text-xs text-bark">{t.orders.downloadSoon}</span>
               ))}
@@ -115,10 +158,13 @@ function OrderCard({ order }: { order: Order }) {
         </div>
       )}
       {!order.requiresShipping && <p className="mt-3 text-xs font-semibold text-moss">⬇ {t.checkout.digitalDelivery}</p>}
+      {order.paymentStatus === 'PROCESSING' && (
+        <p className="mt-3 rounded-xl bg-ochre/15 p-3 text-xs font-semibold text-bark">⏳ {t.orders.processing}</p>
+      )}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4">
         <span className="font-display text-2xl font-extrabold text-clay">{formatPrice(order.total, order.currency)}</span>
-        {order.status === 'PENDING_PAYMENT' && (
+        {order.status === 'PENDING_PAYMENT' && order.paymentStatus === 'UNPAID' && (
           <Link href={`/checkout/${order.id}`} className="btn btn-primary">
             {t.orders.pay}
           </Link>

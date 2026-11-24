@@ -26,7 +26,8 @@ interface Props {
 export function BookCover({ src, title, author, className = '', compact = false }: Props) {
   const [failed, setFailed] = useState(false);
 
-  if (!src || failed) {
+  // Defensa en profundidad: solo portadas https (el backend ya lo exige).
+  if (!src || failed || !src.startsWith('https://')) {
     return (
       <div
         role="img"

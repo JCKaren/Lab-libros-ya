@@ -48,8 +48,9 @@ export interface OrderItem {
   unitPrice: number;
   quantity: number;
   subtotal: number;
-  /** Solo presente cuando el pedido está pagado. */
-  downloadUrl?: string;
+  /** E-book pagado: se puede descargar con un enlace firmado. */
+  downloadable?: boolean;
+  downloadsLeft?: number;
 }
 
 export interface ShippingAddress {
@@ -77,7 +78,8 @@ export interface Order {
   total: number;
   currency: string;
   status: OrderStatus;
-  paymentStatus: 'UNPAID' | 'PAID';
+  /** PROCESSING: el pago se está confirmando con PayPal (en curso o en revisión). */
+  paymentStatus: 'UNPAID' | 'PROCESSING' | 'PAID';
   paidAt?: string;
   createdAt: string;
   updatedAt: string;

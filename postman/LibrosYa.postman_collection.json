@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Libros Ya API",
-    "description": "Pruebas de la API REST de Libros Ya (Express + MongoDB + PayPal): catálogo y stock, pedidos, pagos y envíos.\n\n**Uso:** importa también el entorno `LibrosYa.local.postman_environment.json`, selecciónalo y ejecuta la colección completa con *Run collection* (en orden). Los tokens e ids se guardan solos en variables.\n\n**Requisitos:** backend corriendo y `npm run seed` ejecutado (cuentas cliente@librosya.com y admin@librosya.com).\n\n**Pagos:** con `PAYMENT_PROVIDER=mock` todo corre automático. Con PayPal Sandbox real hay pasos manuales: aprobar cada pago en el navegador (carpetas 04 y 07).\n\n**Ojo:** la colección compra libros de verdad (descuenta stock). Úsala contra una base de pruebas o reajusta el stock desde *Catálogo y stock*.\n\n**Nota:** el login tiene límite de 20 intentos cada 15 min; cada corrida usa 4.",
+    "description": "Pruebas de la API REST de Libros Ya (Express + MongoDB + PayPal): catálogo y stock, pedidos, pagos y envíos.\n\n**Uso:** importa también el entorno `LibrosYa.local.postman_environment.json`, selecciónalo y ejecuta la colección completa con *Run collection* (en orden). Los tokens e ids se guardan solos en variables.\n\n**Requisitos:** backend corriendo y `npm run seed` ejecutado con `SEED_ADMIN_PASSWORD` y `SEED_CLIENT_PASSWORD` (cuentas cliente@librosya.com y admin@librosya.com). Escribe esas contraseñas en las variables `adminPassword` y `clientPassword` del entorno: no vienen incluidas.\n\n**Pagos:** con `PAYMENT_PROVIDER=mock` todo corre automático. Con PayPal Sandbox real hay pasos manuales: aprobar cada pago en el navegador (carpetas 04 y 07).\n\n**Ojo:** la colección compra libros de verdad (descuenta stock). Úsala contra una base de pruebas o reajusta el stock desde *Catálogo y stock*.\n\n**Nota:** el login tiene límite de 20 intentos cada 15 min; cada corrida usa 4.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1585,6 +1585,114 @@
           ]
         },
         {
+          "name": "URL de descarga javascript: → 400",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/books/{{newBookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "books",
+                "{{newBookId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"downloadUrl\": \"javascript:alert(1)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error VALIDATION_ERROR', () => { pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "URL de portada http (sin cifrar) → 400",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/books/{{newBookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "books",
+                "{{newBookId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coverUrl\": \"http://inseguro.example/portada.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error VALIDATION_ERROR', () => { pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Pedido con libro oculto → 400",
           "request": {
             "method": "POST",
@@ -2835,7 +2943,8 @@
                   "const o = pm.response.json().order || {};",
                   "pm.test('Pedido pagado', () => pm.expect(o.paymentStatus).to.eql('PAID'));",
                   "pm.test('Estado DELIVERED', () => pm.expect(o.status).to.eql('DELIVERED'));",
-                  "pm.test('Entrega digital inmediata: incluye enlace de descarga', () => pm.expect(o.items[0].downloadUrl).to.match(/^https?:/));"
+                  "pm.test('Entrega digital inmediata: e-book descargable', () => pm.expect(o.items[0].downloadable).to.be.true);",
+                  "pm.test('No expone la URL permanente del archivo', () => pm.expect(o.items[0]).to.not.have.property('downloadUrl'));"
                 ]
               }
             }
@@ -3483,11 +3592,217 @@
                   "const o = pm.response.json().orders.find(x => x.id === pm.collectionVariables.get('orderId'));",
                   "pm.test('Entregado', () => pm.expect(o.status).to.eql('DELIVERED'));",
                   "pm.test('Ve número de guía', () => pm.expect(o.shipment.trackingNumber).to.eql('SV-123456789'));",
-                  "pm.test('Ve el enlace del e-book pagado', () => pm.expect(o.items.find(i => i.format === 'ebook').downloadUrl).to.match(/^https?:/));"
+                  "pm.test('El e-book pagado es descargable', () => pm.expect(o.items.find(i => i.format === 'ebook').downloadable).to.be.true);"
                 ]
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "05b · Descargas firmadas",
+      "description": "El e-book pagado se descarga con un enlace firmado que vence en minutos y tiene límite de usos.",
+      "item": [
+        {
+          "name": "Emitir enlace de descarga (dueño)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{ebookOrderId}}/downloads/{{ebookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{ebookOrderId}}",
+                "downloads",
+                "{{ebookId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{clientToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('downloadToken', b.path.split('/').pop());",
+                  "pm.test('Ruta firmada', () => pm.expect(b.path).to.match(/^\\/api\\/downloads\\//));",
+                  "pm.test('Cuenta la descarga', () => pm.expect(b.downloadsLeft).to.eql(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Canjear enlace → 302 al archivo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/downloads/{{downloadToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "downloads",
+                "{{downloadToken}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 302', () => pm.response.to.have.status(302));",
+                  "pm.test('Redirige a https', () => pm.expect(pm.response.headers.get('Location')).to.match(/^https:\\/\\//));",
+                  "pm.test('Sin caché', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        },
+        {
+          "name": "Otro usuario intenta emitir el enlace → 404",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{ebookOrderId}}/downloads/{{ebookId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{ebookOrderId}}",
+                "downloads",
+                "{{ebookId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Código de error NOT_FOUND', () => { pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El token de descarga no sirve como sesión → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{downloadToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error UNAUTHORIZED', () => { pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Un token de sesión no sirve como descarga → 410",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/downloads/{{clientToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "downloads",
+                "{{clientToken}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 410', () => pm.response.to.have.status(410));",
+                  "pm.test('Código de error DOWNLOAD_EXPIRED', () => { pm.expect(pm.response.json().error.code).to.eql('DOWNLOAD_EXPIRED'); });"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
         }
       ]
     },
@@ -4289,6 +4604,91 @@
           ]
         }
       ]
+    },
+    {
+      "name": "08 · Cierre de sesión",
+      "description": "Cerrar sesión invalida el token en el servidor.",
+      "item": [
+        {
+          "name": "Cerrar sesión (usuario de prueba)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El token anterior ya no sirve → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error UNAUTHORIZED', () => { pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -4354,6 +4754,10 @@
     },
     {
       "key": "providerOrderIdB",
+      "value": ""
+    },
+    {
+      "key": "downloadToken",
       "value": ""
     },
     {

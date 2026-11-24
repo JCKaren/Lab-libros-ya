@@ -26,7 +26,7 @@ export class AuthService {
     }
     const passwordHash = await this.hasher.hash(input.password);
     const user = await this.users.create({ name: input.name, email: input.email, passwordHash, role: 'cliente' });
-    return this.issue(user);
+    return this.issue(user, 0);
   }
 
   async login(input: { email: string; password: string }): Promise<AuthResult> {
@@ -36,7 +36,12 @@ export class AuthService {
       // Mensaje genérico: no revela si el correo existe.
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Correo o contraseña incorrectos');
     }
-    return this.issue(found.user);
+    return this.issue(found.user, found.tokenVersion);
+  }
+
+  /** Cierra la sesión en todos los dispositivos: los JWT emitidos antes dejan de valer. */
+  async logout(userId: string): Promise<void> {
+    await this.users.bumpTokenVersion(userId);
   }
 
   async me(userId: string): Promise<User> {
@@ -56,7 +61,7 @@ export class AuthService {
     return this.dummyHash;
   }
 
-  private issue(user: User): AuthResult {
-    return { token: this.tokens.sign({ id: user.id, role: user.role, name: user.name }), user };
+  private issue(user: User, tokenVersion: number): AuthResult {
+    return { token: this.tokens.signSession({ id: user.id, tokenVersion }), user };
   }
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Container } from '../container';
-import { authenticate, authorize } from '../middleware/auth';
-import { authLimiter } from '../middleware/rateLimits';
+import { authenticate, authorize, optionalAuth } from '../middleware/auth';
+import { authLimiter, registerLimiter } from '../middleware/rateLimits';
 
 /**
  * Tabla de rutas de la API. La autorización se declara junto a cada ruta
@@ -9,21 +9,23 @@ import { authLimiter } from '../middleware/rateLimits';
  */
 export function buildApiRouter(c: Container): Router {
   const router = Router();
-  const auth = authenticate(c.tokens);
+  const auth = authenticate(c.sessions);
+  const maybeAuth = optionalAuth(c.sessions);
   const cliente = authorize('cliente');
   const admin = authorize('administrador');
   const { auth: authCtrl, books, orders, payments } = c.controllers;
 
   // Autenticación y usuarios
-  router.post('/auth/register', authLimiter, authCtrl.register);
+  router.post('/auth/register', registerLimiter, authLimiter, authCtrl.register);
   router.post('/auth/login', authLimiter, authCtrl.login);
+  router.post('/auth/logout', auth, authCtrl.logout);
   router.get('/auth/me', auth, authCtrl.me);
   router.get('/users/me', auth, authCtrl.me);
   router.patch('/users/me', auth, authCtrl.updateMe);
 
-  // Catálogo (lectura pública) y gestión de catálogo/stock (administrador)
-  router.get('/books', books.list);
-  router.get('/books/:id', books.get);
+  // Catálogo (lectura pública; el administrador ve más) y gestión de catálogo/stock (administrador)
+  router.get('/books', maybeAuth, books.list);
+  router.get('/books/:id', maybeAuth, books.get);
   router.post('/books', auth, admin, books.create);
   router.patch('/books/:id', auth, admin, books.update);
   router.post('/books/:id/stock', auth, admin, books.adjustStock);
@@ -36,6 +38,10 @@ export function buildApiRouter(c: Container): Router {
   router.get('/orders/:id', auth, orders.get);
   router.patch('/orders/:id/status', auth, admin, orders.changeStatus);
   router.post('/orders/:id/cancel', auth, cliente, orders.cancel);
+  router.post('/orders/:id/downloads/:bookId', auth, cliente, orders.issueDownload);
+
+  // Descarga con enlace firmado (sin cabecera Authorization: se abre en el navegador)
+  router.get('/downloads/:token', orders.redeemDownload);
 
   // Pagos
   router.get('/payments/config', payments.config);

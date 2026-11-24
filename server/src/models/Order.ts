@@ -16,6 +16,7 @@ const orderItemSchema = new Schema(
     quantity: { type: Number, required: true, min: 1 },
     subtotal: { type: Number, required: true, min: 0 },
     downloadUrl: { type: String },
+    downloads: { type: Number, default: 0, min: 0 },
   },
   { _id: false },
 );
@@ -62,6 +63,9 @@ const orderSchema = new Schema(
     currency: { type: String, required: true },
     status: { type: String, enum: ORDER_STATUSES, required: true, default: 'PENDING_PAYMENT', index: true },
     paymentStatus: { type: String, enum: ORDER_PAYMENT_STATUSES, required: true, default: 'UNPAID' },
+    activePayment: { type: Types.ObjectId, ref: 'Payment' },
+    paymentLockedAt: { type: Date },
+    stockReserved: { type: Boolean, default: false },
     paidAt: { type: Date },
     history: { type: [statusChangeSchema], default: [] },
   },
@@ -69,6 +73,9 @@ const orderSchema = new Schema(
 );
 
 orderSchema.index({ requiresShipping: 1, status: 1, updatedAt: -1 });
+// Conciliación de cobros interrumpidos y vencimiento de pedidos sin pagar.
+orderSchema.index({ paymentStatus: 1, paymentLockedAt: 1 });
+orderSchema.index({ status: 1, paymentStatus: 1, createdAt: 1 });
 
 export type OrderAttrs = InferSchemaType<typeof orderSchema>;
 export type OrderDocument = HydratedDocument<OrderAttrs>;

@@ -78,7 +78,7 @@ export class MongoBookRepository implements BookRepository {
 
   async update(id: string, input: Partial<BookInput>) {
     if (!isValidObjectId(id)) return null;
-    const doc = await BookModel.findByIdAndUpdate(id, input, { new: true, runValidators: true });
+    const doc = await BookModel.findByIdAndUpdate(id, input, { returnDocument: 'after', runValidators: true });
     return doc ? toBook(doc) : null;
   }
 
@@ -91,13 +91,13 @@ export class MongoBookRepository implements BookRepository {
     const doc = await BookModel.findOneAndUpdate(
       { _id: bookId, stock: { $gte: quantity } },
       { $inc: { stock: -quantity } },
-      { new: true },
+      { returnDocument: 'after' },
     );
     return doc ? toBook(doc) : null;
   }
 
   async incrementStock({ bookId, quantity }: StockLine) {
-    const doc = await BookModel.findByIdAndUpdate(bookId, { $inc: { stock: quantity } }, { new: true });
+    const doc = await BookModel.findByIdAndUpdate(bookId, { $inc: { stock: quantity } }, { returnDocument: 'after' });
     return doc ? toBook(doc) : null;
   }
 }

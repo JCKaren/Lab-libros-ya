@@ -29,7 +29,8 @@ export function CheckoutView() {
   if (error || !data) return <Alert tone="error">{errorMessage(error)}</Alert>;
 
   const { order, config } = data;
-  const payable = order.status === 'PENDING_PAYMENT';
+  const payable = order.status === 'PENDING_PAYMENT' && order.paymentStatus === 'UNPAID';
+  const processing = order.paymentStatus === 'PROCESSING';
 
   const cancel = async () => {
     try {
@@ -65,7 +66,8 @@ export function CheckoutView() {
               config={config}
               onPaid={(paid) => {
                 setData((prev) => (prev ? { ...prev, order: paid } : prev));
-                setFeedback({ tone: 'success', text: order.requiresShipping ? t.checkout.successShipping : t.checkout.successDigital });
+                if (paid.paymentStatus === 'PROCESSING') setFeedback({ tone: 'info', text: t.orders.processing });
+                else setFeedback({ tone: 'success', text: order.requiresShipping ? t.checkout.successShipping : t.checkout.successDigital });
               }}
               onCancelled={() => setFeedback({ tone: 'info', text: t.checkout.cancelled })}
               onError={(err) => setFeedback({ tone: 'error', text: err instanceof ApiError ? errorMessage(err) : t.checkout.failed })}
@@ -76,7 +78,8 @@ export function CheckoutView() {
           </>
         ) : (
           <div className="space-y-3">
-            {order.paymentStatus !== 'PAID' && <Alert tone="info">{t.checkout.notPayable}</Alert>}
+            {processing && <Alert tone="info">⏳ {t.orders.processing}</Alert>}
+            {!processing && order.paymentStatus !== 'PAID' && <Alert tone="info">{t.checkout.notPayable}</Alert>}
             <Link href="/orders" className="btn btn-primary w-full py-3">
               {t.nav.orders}
             </Link>

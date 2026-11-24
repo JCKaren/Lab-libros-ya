@@ -15,8 +15,10 @@ import { BookService } from './services/BookService';
 import { InventoryService } from './services/InventoryService';
 import { NullOrderNotifier, type OrderNotifier } from './services/OrderNotifier';
 import { OrderService } from './services/OrderService';
+import { DownloadService } from './services/DownloadService';
 import { BcryptPasswordHasher } from './services/PasswordHasher';
-import { JwtTokenService, type TokenService } from './services/TokenService';
+import { SessionService } from './services/SessionService';
+import { JwtTokenService } from './services/TokenService';
 import { MockGateway } from './services/payments/MockGateway';
 import type { PaymentGateway } from './services/payments/PaymentGateway';
 import { PaymentService } from './services/payments/PaymentService';
@@ -27,7 +29,9 @@ import { PaypalGateway } from './services/payments/PaypalGateway';
  * que conoce las implementaciones concretas. El resto depende de interfaces (DIP).
  */
 export interface Container {
-  tokens: TokenService;
+  sessions: SessionService;
+  /** Tareas periódicas: conciliar cobros y vencer pedidos sin pagar. */
+  maintenance(): Promise<{ settled: number; expired: number }>;
   controllers: {
     auth: AuthController;
     books: BookController;
@@ -68,18 +72,25 @@ export function createContainer(): Container {
   const orders = new MongoOrderRepository();
   const payments = new MongoPaymentRepository();
 
+  const sessions = new SessionService(tokens, users);
   const authService = new AuthService(users, new BcryptPasswordHasher(), tokens);
   const bookService = new BookService(books, notifier);
   const inventory = new InventoryService(books, notifier);
   const orderService = new OrderService(orders, books, notifier, env.CURRENCY);
   const paymentService = new PaymentService(createPaymentGateway(), payments, orders, inventory, notifier, env.PAYPAL_CLIENT_ID);
+  const downloadService = new DownloadService(orders, tokens);
 
   return {
-    tokens,
+    sessions,
+    async maintenance() {
+      const settled = await paymentService.reconcile();
+      const expired = await orderService.expireUnpaid();
+      return { settled, expired };
+    },
     controllers: {
       auth: new AuthController(authService),
-      books: new BookController(bookService, tokens),
-      orders: new OrderController(orderService),
+      books: new BookController(bookService),
+      orders: new OrderController(orderService, downloadService),
       payments: new PaymentController(paymentService, env.CURRENCY),
     },
     attachRealtime(io) {

@@ -16,10 +16,21 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const SHIPPING_STATUSES = ['PENDING', 'PREPARING', 'SHIPPED', 'DELIVERED'] as const satisfies readonly OrderStatus[];
 export type ShippingStatus = (typeof SHIPPING_STATUSES)[number];
 
-export const PAYMENT_STATUSES = ['CREATED', 'APPROVED', 'CAPTURING', 'CAPTURED', 'FAILED', 'CANCELLED'] as const;
+/**
+ * Pago en el proveedor:
+ *  CREATED ─► CAPTURING ─► CAPTURED
+ *                 │  ├──► PENDING (revisión del proveedor; se concilia después)
+ *                 │  └──► FAILED
+ *                 └─────► REFUNDED (cobro que no se pudo verificar: se reembolsa)
+ */
+export const PAYMENT_STATUSES = ['CREATED', 'APPROVED', 'CAPTURING', 'PENDING', 'CAPTURED', 'FAILED', 'REFUNDED', 'CANCELLED'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const ORDER_PAYMENT_STATUSES = ['UNPAID', 'PAID'] as const;
+/**
+ * Estado de cobro del pedido. PROCESSING es el candado a nivel de pedido:
+ * mientras exista, nadie puede cancelar el pedido ni iniciar otra captura.
+ */
+export const ORDER_PAYMENT_STATUSES = ['UNPAID', 'PROCESSING', 'PAID'] as const;
 export type OrderPaymentStatus = (typeof ORDER_PAYMENT_STATUSES)[number];
 
 export type Actor = Role | 'system';

@@ -94,6 +94,8 @@ export const es = {
     tracking: 'Guía',
     carrier: 'Transportadora',
     digital: 'Digital',
+    downloadsLeft: '{n} descargas restantes',
+    processing: 'Estamos confirmando tu pago. Se actualizará solo en unos minutos.',
   },
   status: {
     PENDING_PAYMENT: 'Pendiente de pago',
@@ -158,6 +160,7 @@ export const es = {
     submitRegister: 'Crear cuenta',
     noAccount: '¿No tienes cuenta?',
     haveAccount: '¿Ya tienes cuenta?',
+    passwordHint: 'Mínimo 10 caracteres, con letras y números.',
   },
   guard: { checking: 'Verificando acceso...', denied: 'No tienes acceso a esta sección.', goHome: 'Volver al inicio' },
   common: { loading: 'Cargando...', retry: 'Reintentar', back: 'Volver', error: 'Algo salió mal.' },
@@ -183,6 +186,15 @@ export const es = {
     UNAUTHORIZED: 'Tu sesión expiró. Ingresa de nuevo.',
     NOT_FOUND: 'No encontrado.',
     UNKNOWN: 'Ocurrió un error inesperado.',
+    PAYMENT_PENDING_CONFIRMATION: 'No pudimos confirmar el pago aún. Lo verificaremos en unos minutos; no vuelvas a pagar.',
+    PAYMENT_NOT_CAPTURABLE: 'Este intento de pago ya no se puede usar. Inténtalo de nuevo.',
+    TOO_MANY_PAYMENT_ATTEMPTS: 'Alcanzaste el máximo de intentos de pago para este pedido.',
+    TOO_MANY_PENDING_ORDERS: 'Tienes demasiados pedidos sin pagar. Paga o cancela alguno.',
+    ORDER_NOT_PAID: 'El pedido aún no está pagado.',
+    DOWNLOAD_LIMIT_REACHED: 'Alcanzaste el máximo de descargas de este libro.',
+    DOWNLOAD_EXPIRED: 'El enlace de descarga venció. Genera uno nuevo.',
+    PAYLOAD_TOO_LARGE: 'La solicitud es demasiado grande.',
+    CONFLICT: 'Ese recurso ya existe.',
   },
 };
 

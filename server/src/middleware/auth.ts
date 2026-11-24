@@ -1,7 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { AuthUser } from '../domain/entities';
 import type { Role } from '../domain/roles';
-import type { TokenService } from '../services/TokenService';
+import { SessionService } from '../services/SessionService';
 import { AppError } from '../utils/AppError';
 
 declare global {
@@ -13,15 +13,33 @@ declare global {
   }
 }
 
-/** Exige un JWT válido en `Authorization: Bearer <token>`. */
-export function authenticate(tokens: TokenService): RequestHandler {
+/**
+ * Exige una sesión válida (`Authorization: Bearer <token>`). La sesión se valida
+ * contra la base de datos: usuarios borrados, degradados o con sesión cerrada quedan fuera.
+ */
+export function authenticate(sessions: SessionService): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const header = req.headers.authorization ?? '';
-    const [scheme, token] = header.split(' ');
-    const user = scheme === 'Bearer' && token ? tokens.verify(token) : null;
-    if (!user) return next(AppError.unauthorized());
-    req.auth = user;
-    next();
+    sessions
+      .resolve(SessionService.bearer(req.headers.authorization))
+      .then((session) => {
+        if (!session) return next(AppError.unauthorized());
+        req.auth = session.user;
+        next();
+      })
+      .catch(next);
+  };
+}
+
+/** Sesión opcional: rutas públicas que muestran más datos a un administrador. */
+export function optionalAuth(sessions: SessionService): RequestHandler {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    sessions
+      .resolve(SessionService.bearer(req.headers.authorization))
+      .then((session) => {
+        if (session) req.auth = session.user;
+        next();
+      })
+      .catch(next);
   };
 }
 

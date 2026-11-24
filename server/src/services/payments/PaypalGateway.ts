@@ -59,17 +59,38 @@ export class PaypalGateway implements PaymentGateway {
       return this.toCaptureResult(order);
     } catch (err) {
       if (err instanceof PaypalApiError && err.issue === 'ORDER_ALREADY_CAPTURED') {
-        return this.toCaptureResult(await this.request<PaypalOrder>(`/v2/checkout/orders/${id}`, { method: 'GET' }));
+        return this.getCaptureStatus(providerOrderId);
+      }
+      // 4xx de PayPal (no aprobada, tarjeta rechazada...): definitivo, no hubo cobro.
+      if (err instanceof PaypalApiError && err.status >= 400 && err.status < 500) {
+        return { state: 'FAILED', rawStatus: err.issue };
       }
       throw err;
     }
   }
 
+  async getCaptureStatus(providerOrderId: string): Promise<CaptureResult> {
+    const id = encodeURIComponent(providerOrderId);
+    return this.toCaptureResult(await this.request<PaypalOrder>(`/v2/checkout/orders/${id}`, { method: 'GET' }));
+  }
+
+  async refund(captureId: string, amount: number, currency: string): Promise<void> {
+    const id = encodeURIComponent(captureId);
+    await this.request(`/v2/payments/captures/${id}/refund`, {
+      method: 'POST',
+      body: { amount: { value: formatAmount(amount), currency_code: currency } },
+      requestId: `refund-${captureId}`,
+    });
+  }
+
   private toCaptureResult(order: PaypalOrder): CaptureResult {
     const unit = order.purchase_units?.[0];
     const capture = unit?.payments?.captures?.[0];
+    let state: CaptureResult['state'] = 'FAILED';
+    if (capture?.status === 'COMPLETED' && order.status === 'COMPLETED') state = 'COMPLETED';
+    else if (capture?.status === 'PENDING') state = 'PENDING';
     return {
-      completed: order.status === 'COMPLETED' && capture?.status === 'COMPLETED',
+      state,
       captureId: capture?.id,
       amount: capture?.amount ? Number(capture.amount.value) : undefined,
       currency: capture?.amount?.currency_code,

@@ -5,11 +5,27 @@ import { AppError } from '../utils/AppError';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Identificador inválido');
 
-export const registerSchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  email: z.email().max(120),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
-});
+/**
+ * Política de contraseñas: 10+ caracteres con letras y números.
+ * Se usa en el registro y en el cambio de contraseña (script de rotación).
+ */
+export const passwordSchema = z
+  .string()
+  .min(10, 'La contraseña debe tener al menos 10 caracteres')
+  .max(128)
+  .regex(/[A-Za-z]/, 'La contraseña debe incluir letras')
+  .regex(/\d/, 'La contraseña debe incluir números');
+
+export const registerSchema = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    email: z.email().max(120),
+    password: passwordSchema,
+  })
+  .refine((v) => !v.password.toLowerCase().includes(v.email.split('@')[0].toLowerCase()), {
+    path: ['password'],
+    message: 'La contraseña no puede contener tu correo',
+  });
 
 export const loginSchema = z.object({
   email: z.email(),
@@ -19,7 +35,9 @@ export const loginSchema = z.object({
 export const updateProfileSchema = z.object({ name: z.string().trim().min(2).max(80) });
 
 const localized = (max: number) => z.object({ es: z.string().trim().min(1).max(max), en: z.string().trim().min(1).max(max) });
-const optionalUrl = z.url().max(500).or(z.literal('')).default('');
+/** Solo https: bloquea javascript:, data: y enlaces sin cifrar en portadas y descargas. */
+const httpsUrl = z.url({ protocol: /^https$/, error: 'Debe ser una URL https://' }).max(500);
+const optionalUrl = httpsUrl.or(z.literal('')).default('');
 
 export const bookSchema = z.object({
   title: localized(150),
@@ -82,6 +100,9 @@ export const updateStatusSchema = z.object({
 });
 
 export const idParamSchema = z.object({ id: objectId });
+
+export const downloadParamsSchema = z.object({ id: objectId, bookId: objectId });
+export const downloadTokenSchema = z.object({ token: z.string().min(20).max(1000) });
 
 export const createPaymentSchema = z.object({ orderId: objectId });
 

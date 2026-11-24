@@ -32,10 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else window.localStorage.removeItem(TOKEN_KEY);
   }, []);
 
-  const logout = useCallback(() => applySession(null, null), [applySession]);
+  /** Borra la sesión local (sin llamar al servidor: se usa también ante un 401). */
+  const clearSession = useCallback(() => applySession(null, null), [applySession]);
+
+  /** Cierre de sesión explícito: revoca el token en el servidor y luego lo borra localmente. */
+  const logout = useCallback(() => {
+    const hadToken = tokenRef.current !== null;
+    const revoke = hadToken ? authApi.logout().catch(() => undefined) : Promise.resolve();
+    void revoke.finally(clearSession);
+  }, [clearSession]);
 
   useEffect(() => {
-    configureHttp({ getToken: () => tokenRef.current, onUnauthorized: logout });
+    configureHttp({ getToken: () => tokenRef.current, onUnauthorized: clearSession });
 
     const saved = window.localStorage.getItem(TOKEN_KEY);
     tokenRef.current = saved;
@@ -47,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .catch(() => applySession(null, null))
       : Promise.resolve();
     void restore.finally(() => setReady(true));
-  }, [applySession, logout]);
+  }, [applySession, clearSession]);
 
   const login = useCallback(
     async (email: string, password: string) => {

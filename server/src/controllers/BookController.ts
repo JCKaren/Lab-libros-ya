@@ -1,14 +1,10 @@
 import type { Request, Response } from 'express';
 import { publicBookView } from '../presenters/views';
 import type { BookService } from '../services/BookService';
-import type { TokenService } from '../services/TokenService';
 import { bookQuerySchema, bookSchema, bookUpdateSchema, idParamSchema, parse, stockAdjustSchema } from '../validators/schemas';
 
 export class BookController {
-  constructor(
-    private readonly books: BookService,
-    private readonly tokens: TokenService,
-  ) {}
+  constructor(private readonly books: BookService) {}
 
   /** Público. Con `?all=true` y sesión de administrador incluye libros inactivos y enlaces de descarga. */
   list = async (req: Request, res: Response) => {
@@ -49,8 +45,8 @@ export class BookController {
     res.status(204).end();
   };
 
+  /** `req.auth` lo llena `optionalAuth` con una sesión ya validada contra la base de datos. */
   private isAdmin(req: Request): boolean {
-    const token = req.headers.authorization?.replace(/^Bearer /, '');
-    return token ? this.tokens.verify(token)?.role === 'administrador' : false;
+    return req.auth?.role === 'administrador';
   }
 }

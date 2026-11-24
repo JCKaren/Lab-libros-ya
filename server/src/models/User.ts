@@ -7,6 +7,8 @@ const userSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, required: true, default: 'cliente' },
+    /** Se incrementa al cerrar sesión o cambiar la contraseña: invalida todos los JWT emitidos antes. */
+    tokenVersion: { type: Number, required: true, default: 0 },
   },
   { timestamps: true },
 );
