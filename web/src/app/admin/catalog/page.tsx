@@ -8,6 +8,7 @@ import { LiveIndicator } from '@/components/LiveIndicator';
 import { RoleGuard } from '@/components/RoleGuard';
 import { booksApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { invalidFieldLabels } from '@/lib/formValidation';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 import { useRealtime } from '@/lib/realtime/useRealtime';
 import { BOOK_CATEGORIES, BOOK_FORMATS, LOW_STOCK_THRESHOLD, type Book, type BookCategory, type BookFormat, type BookInput } from '@/lib/types';
@@ -170,10 +171,17 @@ function BookForm({ onCreate }: { onCreate: (input: BookInput) => Promise<boolea
   const { t } = useI18n();
   const [format, setFormat] = useState<BookFormat>('ebook');
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formEl = event.currentTarget;
+    const invalid = invalidFieldLabels(formEl);
+    if (invalid.length) {
+      setFormError(`${t.manage.missingFields} ${invalid.join(', ')}.`);
+      return;
+    }
+    setFormError(null);
     const form = new FormData(formEl);
     const v = (key: string) => String(form.get(key) ?? '').trim();
     setSaving(true);
@@ -207,8 +215,9 @@ function BookForm({ onCreate }: { onCreate: (input: BookInput) => Promise<boolea
   );
 
   return (
-    <form onSubmit={submit} className="card h-fit space-y-4 p-6 lg:sticky lg:top-24">
+    <form onSubmit={submit} noValidate className="card h-fit space-y-4 p-6 lg:sticky lg:top-24">
       <h2 className="font-display text-2xl font-bold">{t.manage.newBook}</h2>
+      {formError && <Alert tone="error">{formError}</Alert>}
       <div className="grid grid-cols-2 gap-3">
         {input('titleEs', t.manage.titleEs, { required: true, maxLength: 150 })}
         {input('titleEn', t.manage.titleEn, { required: true, maxLength: 150 })}
